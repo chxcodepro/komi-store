@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.Job
@@ -90,6 +91,8 @@ import zed.rainxch.details.presentation.model.LogResult.Error
 import zed.rainxch.details.presentation.model.SigningKeyWarning
 import zed.rainxch.details.presentation.model.SupportedLanguages
 import zed.rainxch.details.presentation.model.TranslationState
+import zed.rainxch.details.presentation.translation.isSameLanguage
+import zed.rainxch.details.presentation.translation.resolveAutoTranslateTarget
 import zed.rainxch.githubstore.core.presentation.res.Res
 import zed.rainxch.githubstore.core.presentation.res.failed_to_load
 import zed.rainxch.githubstore.core.presentation.res.star_added
@@ -446,6 +449,7 @@ class DetailsViewModel(
             is DetailsAction.TranslateAbout -> {
                 val readme = _state.value.readmeMarkdown ?: return
                 aboutTranslationJob?.cancel()
+                _state.update { it.copy(readmeTranslationSource = readme) }
                 aboutTranslationJob =
                     translateContent(
                         text = readme,
@@ -481,12 +485,36 @@ class DetailsViewModel(
                 }
             }
 
+            DetailsAction.ClearAboutTranslation -> {
+                aboutTranslationJob?.cancel()
+                _state.update {
+                    it.copy(aboutTranslation = TranslationState(), readmeTranslationSource = null)
+                }
+            }
+
             is DetailsAction.ShowLanguagePicker -> {
                 _state.update {
                     it.copy(
                         isLanguagePickerVisible = true,
                         languagePickerTarget = action.target,
+                        languagePickerQuery = "",
+                        filteredLanguages = SupportedLanguages.all.toImmutableList(),
                     )
+                }
+            }
+
+            is DetailsAction.OnLanguageQueryChange -> {
+                val query = action.query
+                val filtered = if (query.isBlank()) {
+                    SupportedLanguages.all
+                } else {
+                    SupportedLanguages.all.filter {
+                        it.displayName.contains(query, ignoreCase = true) ||
+                            it.code.contains(query, ignoreCase = true)
+                    }
+                }
+                _state.update {
+                    it.copy(languagePickerQuery = query, filteredLanguages = filtered.toImmutableList())
                 }
             }
 
@@ -2789,6 +2817,8 @@ class DetailsViewModel(
                     )
 
                 observeInstalledApp(repo.id)
+
+                maybeAutoTranslate(readmeBody = readme?.first)
             } catch (e: RateLimitException) {
                 logger.error("Rate limited: ${e.message}")
                 val seconds = e.rateLimitInfo.timeUntilReset().inWholeSeconds
@@ -2979,11 +3009,38 @@ class DetailsViewModel(
         }
     }
 
+    private fun maybeAutoTranslate(readmeBody: String?) {
+        if (readmeBody.isNullOrBlank()) return
+        viewModelScope.launch {
+            val state = _state.value
+            if (state.aboutTranslation.translatedText != null) return@launch
+            if (state.readmeMarkdown != readmeBody) return@launch
+
+            val target =
+                resolveAutoTranslateTarget(
+                    tweaksRepository = tweaksRepository,
+                    fallbackLanguageCode = state.deviceLanguageCode,
+                ) ?: return@launch
+            if (isSameLanguage(state.readmeLanguage, target)) return@launch
+
+            aboutTranslationJob?.cancel()
+            _state.update { it.copy(readmeTranslationSource = readmeBody) }
+            aboutTranslationJob = translateContent(
+                text = readmeBody,
+                targetLanguageCode = target,
+                updateState = { ts -> _state.update { it.copy(aboutTranslation = ts) } },
+                getCurrentState = { _state.value.aboutTranslation },
+                notifyOnFailure = false,
+            )
+        }
+    }
+
     private fun translateContent(
         text: String,
         targetLanguageCode: String,
         updateState: (TranslationState) -> Unit,
         getCurrentState: () -> TranslationState,
+        notifyOnFailure: Boolean = true,
     ): Job = viewModelScope.launch {
         try {
             updateState(
@@ -3026,9 +3083,11 @@ class DetailsViewModel(
                     error = e.message,
                 ),
             )
-            _events.send(
-                DetailsEvent.OnMessage(getString(Res.string.translation_failed)),
-            )
+            if (notifyOnFailure) {
+                _events.send(
+                    DetailsEvent.OnMessage(getString(Res.string.translation_failed)),
+                )
+            }
         }
     }
 

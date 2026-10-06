@@ -121,8 +121,14 @@ sealed interface DetailsAction {
 
     data object ToggleWhatsNewTranslation : DetailsAction
 
+    data object ClearAboutTranslation : DetailsAction
+
     data class ShowLanguagePicker(
         val target: TranslationTarget,
+    ) : DetailsAction
+
+    data class OnLanguageQueryChange(
+        val query: String,
     ) : DetailsAction
 
     data object DismissLanguagePicker : DetailsAction

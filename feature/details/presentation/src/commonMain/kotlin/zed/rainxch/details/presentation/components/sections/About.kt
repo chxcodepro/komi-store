@@ -54,6 +54,7 @@ fun LazyListScope.about(
     readmeLanguage: String?,
     onTranslateLanguage: ((String) -> Unit)? = null,
     onOpenInternalMarkdown: ((String) -> Unit)? = null,
+    translationControls: (@Composable () -> Unit)? = null,
 ) {
     item {
         val colors = LocalPersonality.current.colors
@@ -89,6 +90,12 @@ fun LazyListScope.about(
             }
         }
         Spacer(Modifier.height(8.dp))
+    }
+
+    if (translationControls != null) {
+        item(key = "about_translation") {
+            translationControls()
+        }
     }
 
     item(key = "about_markdown") {

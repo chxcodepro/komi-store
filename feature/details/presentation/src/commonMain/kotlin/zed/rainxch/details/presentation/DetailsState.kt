@@ -7,6 +7,7 @@ import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.persistentSetOf
+import kotlinx.collections.immutable.toImmutableList
 import zed.rainxch.core.domain.model.account.github.GithubAsset
 import zed.rainxch.core.domain.model.account.github.GithubRelease
 import zed.rainxch.core.domain.model.account.github.GithubRepoSummary
@@ -18,11 +19,13 @@ import zed.rainxch.core.domain.model.system.SystemArchitecture
 import zed.rainxch.core.domain.utils.PlatformRelease
 import zed.rainxch.details.domain.model.ReleaseCategory
 import zed.rainxch.details.domain.model.RepoStats
+import zed.rainxch.details.domain.model.SupportedLanguage
 import zed.rainxch.details.presentation.model.AttestationStatus
 import zed.rainxch.details.presentation.model.DowngradeWarning
 import zed.rainxch.details.presentation.model.DownloadStage
 import zed.rainxch.details.presentation.model.InstallLogItem
 import zed.rainxch.details.presentation.model.SigningKeyWarning
+import zed.rainxch.details.presentation.model.SupportedLanguages
 import zed.rainxch.details.presentation.model.TranslationState
 import zed.rainxch.details.presentation.model.TranslationTarget
 
@@ -47,6 +50,7 @@ data class DetailsState(
     val stats: RepoStats? = null,
     val readmeMarkdown: String? = null,
     val readmeLanguage: String? = null,
+    val displayedReadmeMarkdown: String? = null,
     val installLogs: ImmutableList<InstallLogItem> = persistentListOf(),
     val isDownloading: Boolean = false,
     val downloadProgressPercent: Int? = null,
@@ -75,6 +79,8 @@ data class DetailsState(
     val whatsNewTranslation: TranslationState = TranslationState(),
     val isLanguagePickerVisible: Boolean = false,
     val languagePickerTarget: TranslationTarget? = null,
+    val languagePickerQuery: String = "",
+    val filteredLanguages: ImmutableList<SupportedLanguage> = SupportedLanguages.all.toImmutableList(),
     val deviceLanguageCode: String = "en",
     val isComingFromUpdate: Boolean = false,
     val downgradeWarning: DowngradeWarning? = null,

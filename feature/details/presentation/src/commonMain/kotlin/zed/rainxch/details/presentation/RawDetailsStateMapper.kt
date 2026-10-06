@@ -65,6 +65,10 @@ internal fun RawDetailsState.toView(): DetailsState {
         stats = stats,
         readmeMarkdown = readmeMarkdown,
         readmeLanguage = readmeLanguage,
+        displayedReadmeMarkdown = aboutTranslation
+            .translatedText
+            ?.takeIf { aboutTranslation.isShowingTranslation && readmeTranslationSource == readmeMarkdown }
+            ?: readmeMarkdown,
         installLogs = installLogs.toImmutableList(),
         isDownloading = isDownloading,
         downloadProgressPercent = downloadProgressPercent,
@@ -93,6 +97,8 @@ internal fun RawDetailsState.toView(): DetailsState {
         whatsNewTranslation = whatsNewTranslation,
         isLanguagePickerVisible = isLanguagePickerVisible,
         languagePickerTarget = languagePickerTarget,
+        languagePickerQuery = languagePickerQuery,
+        filteredLanguages = filteredLanguages,
         deviceLanguageCode = deviceLanguageCode,
         isComingFromUpdate = isComingFromUpdate,
         downgradeWarning = downgradeWarning,

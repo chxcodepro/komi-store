@@ -89,7 +89,9 @@ import zed.rainxch.core.presentation.utils.arrowKeyScroll
 import zed.rainxch.core.presentation.utils.contentWidthCap
 import zed.rainxch.core.presentation.utils.isPullToRefreshSupported
 import zed.rainxch.details.presentation.components.ApkInspectSheet
+import zed.rainxch.details.presentation.components.LanguagePicker
 import zed.rainxch.details.presentation.components.PlatformHandoffSheet
+import zed.rainxch.details.presentation.components.TranslationCard
 import zed.rainxch.details.presentation.components.sections.about
 import zed.rainxch.details.presentation.components.sections.header
 import zed.rainxch.details.presentation.components.sections.logs
@@ -97,6 +99,7 @@ import zed.rainxch.details.presentation.components.sections.releaseChannel
 import zed.rainxch.details.presentation.components.sections.stats
 import zed.rainxch.details.presentation.components.sections.whatsNew
 import zed.rainxch.details.presentation.components.states.ErrorState
+import zed.rainxch.details.presentation.model.TranslationTarget
 import zed.rainxch.githubstore.core.presentation.res.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -674,11 +677,12 @@ fun DetailsScreen(
                             )
                         }
 
-                        state.readmeMarkdown?.let {
+                        state.displayedReadmeMarkdown?.let { readme ->
                             about(
-                                readmeMarkdown = state.readmeMarkdown,
+                                readmeMarkdown = readme,
                                 readmeLanguage = state.readmeLanguage,
                                 onTranslateLanguage = onTranslateLanguage,
+                                translationControls = aboutTranslationControls(state, onAction),
                             )
                         }
 
@@ -690,6 +694,41 @@ fun DetailsScreen(
                 }
             }
         }
+    }
+
+    LanguagePicker(
+        isVisible = state.isLanguagePickerVisible && state.languagePickerTarget == TranslationTarget.About,
+        query = state.languagePickerQuery,
+        languages = state.filteredLanguages,
+        selectedLanguageCode = state.aboutTranslation.targetLanguageCode ?: state.deviceLanguageCode,
+        deviceLanguageCode = state.deviceLanguageCode,
+        onQueryChange = { onAction(DetailsAction.OnLanguageQueryChange(it)) },
+        onLanguageSelected = { language ->
+            onAction(DetailsAction.DismissLanguagePicker)
+            onAction(DetailsAction.TranslateAbout(language.code))
+        },
+        onDismiss = { onAction(DetailsAction.DismissLanguagePicker) },
+    )
+}
+
+private fun aboutTranslationControls(
+    state: DetailsState,
+    onAction: (DetailsAction) -> Unit,
+): (@Composable () -> Unit)? {
+    val translation = state.aboutTranslation
+    val hasAnythingToShow =
+        translation.translatedText != null || translation.isTranslating || translation.error != null
+    if (!hasAnythingToShow) return null
+
+    return {
+        TranslationCard(
+            state = translation,
+            deviceLanguageCode = state.deviceLanguageCode,
+            onPickLanguage = { onAction(DetailsAction.ShowLanguagePicker(TranslationTarget.About)) },
+            onTranslate = { code -> onAction(DetailsAction.TranslateAbout(code)) },
+            onToggle = { onAction(DetailsAction.ToggleAboutTranslation) },
+            onCancel = { onAction(DetailsAction.ClearAboutTranslation) },
+        )
     }
 }
 

@@ -1,9 +1,11 @@
 package zed.rainxch.details.presentation
 
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.persistentSetOf
+import kotlinx.collections.immutable.toImmutableList
 import zed.rainxch.core.domain.model.apk.ApkInspection
 import zed.rainxch.core.domain.model.account.github.GithubAsset
 import zed.rainxch.core.domain.model.account.github.GithubRelease
@@ -14,11 +16,13 @@ import zed.rainxch.core.domain.model.repository.DiscoveryPlatform
 import zed.rainxch.core.domain.model.system.SystemArchitecture
 import zed.rainxch.details.domain.model.ReleaseCategory
 import zed.rainxch.details.domain.model.RepoStats
+import zed.rainxch.details.domain.model.SupportedLanguage
 import zed.rainxch.details.presentation.model.AttestationStatus
 import zed.rainxch.details.presentation.model.DowngradeWarning
 import zed.rainxch.details.presentation.model.DownloadStage
 import zed.rainxch.details.presentation.model.InstallLogItem
 import zed.rainxch.details.presentation.model.SigningKeyWarning
+import zed.rainxch.details.presentation.model.SupportedLanguages
 import zed.rainxch.details.presentation.model.TranslationState
 import zed.rainxch.details.presentation.model.TranslationTarget
 
@@ -67,9 +71,12 @@ internal data class RawDetailsState(
     val aboutMeasuredHeightPx: Float? = null,
     val whatsNewMeasuredHeightPx: Float? = null,
     val aboutTranslation: TranslationState = TranslationState(),
+    val readmeTranslationSource: String? = null,
     val whatsNewTranslation: TranslationState = TranslationState(),
     val isLanguagePickerVisible: Boolean = false,
     val languagePickerTarget: TranslationTarget? = null,
+    val languagePickerQuery: String = "",
+    val filteredLanguages: ImmutableList<SupportedLanguage> = SupportedLanguages.all.toImmutableList(),
     val deviceLanguageCode: String = "en",
     val isComingFromUpdate: Boolean = false,
     val downgradeWarning: DowngradeWarning? = null,
