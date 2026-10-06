@@ -156,6 +156,8 @@ sealed interface TweaksAction {
 
     data object OnTranslationProviderExpandToggle : TweaksAction
 
+    data object OnTranslationProxyExpandToggle : TweaksAction
+
     data object OnTranslationTargetPickerOpen : TweaksAction
 
     data object OnTranslationTargetPickerDismiss : TweaksAction

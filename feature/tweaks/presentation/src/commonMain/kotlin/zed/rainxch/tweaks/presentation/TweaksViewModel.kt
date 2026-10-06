@@ -84,6 +84,9 @@ class TweaksViewModel(
                 "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?" +
                         "(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$",
             )
+
+        private const val TRANSLATION_PROBE_URL =
+            "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=ping"
     }
 
     private var hasLoadedInitialData = false
@@ -751,7 +754,7 @@ class TweaksViewModel(
                 viewModelScope.launch {
                     val outcome: ProxyTestOutcome =
                         try {
-                            proxyTester.test(config)
+                            proxyTester.test(config, probeUrlFor(action.scope))
                         } catch (e: CancellationException) {
 
                             throw e
@@ -949,6 +952,9 @@ class TweaksViewModel(
 
             TweaksAction.OnTranslationProviderExpandToggle ->
                 _state.update { it.copy(translationProviderExpanded = !it.translationProviderExpanded) }
+
+            TweaksAction.OnTranslationProxyExpandToggle ->
+                _state.update { it.copy(translationProxyExpanded = !it.translationProxyExpanded) }
 
             TweaksAction.OnTranslationTargetPickerOpen ->
                 _state.update { it.copy(translationTargetPickerOpen = true, languageQuery = "") }
@@ -1494,6 +1500,13 @@ class TweaksViewModel(
             }
         }
     }
+
+    private fun probeUrlFor(scope: ProxyScope): String =
+        when (scope) {
+            ProxyScope.DISCOVERY -> "https://api.github.com/zen"
+            ProxyScope.DOWNLOAD -> "https://github.com/robots.txt"
+            ProxyScope.TRANSLATION -> TRANSLATION_PROBE_URL
+        }
 
     private suspend fun runProbe(config: ProxyConfig, url: String): Long? = try {
         val outcome = proxyTester.test(config, url)

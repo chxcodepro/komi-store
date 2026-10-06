@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.stringResource
+import zed.rainxch.core.domain.model.settings.ProxyScope
 import zed.rainxch.core.domain.model.settings.SupportedTranslationLanguages
 import zed.rainxch.core.domain.model.settings.TranslationProvider
 import zed.rainxch.core.presentation.components.buttons.KomiButton
@@ -83,6 +84,19 @@ fun translationSectionContent(
                 TranslationProvider.MICROSOFT -> MicrosoftCredentialsForm(state, onAction)
                 TranslationProvider.GOOGLE -> Unit
             }
+        }
+
+        SettingsExpandableRow(
+            title = stringResource(Res.string.translation_proxy_title),
+            subtitle = if (state.useMain(ProxyScope.TRANSLATION)) {
+                stringResource(Res.string.tweaks_connection_use_main)
+            } else {
+                proxySummary(state.formFor(ProxyScope.TRANSLATION))
+            },
+            expanded = state.translationProxyExpanded,
+            onToggle = { onAction(TweaksAction.OnTranslationProxyExpandToggle) },
+        ) {
+            ProxyScopeEditor(scope = ProxyScope.TRANSLATION, state = state, onAction = onAction)
         }
 
         SettingsRow(

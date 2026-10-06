@@ -106,8 +106,6 @@ fun connectionSectionContent(
         }
 
         ProxyScope.entries.forEachIndexed { index, scope ->
-            val useMain = state.useMain(scope)
-            val form = state.formFor(scope)
             SettingsExpandableRow(
                 title = scopeTitle(scope),
                 subtitle = stringResource(Res.string.tweaks_connection_overrides_section),
@@ -115,55 +113,7 @@ fun connectionSectionContent(
                 onToggle = { onAction(TweaksAction.OnProxyScopeExpandToggle(scope)) },
                 last = index == ProxyScope.entries.lastIndex,
             ) {
-                KomiSegmented(
-                    selected = useMain,
-                    onSelect = { onAction(TweaksAction.OnScopeUseMainToggled(scope, it)) },
-                    size = KomiIconButtonSize.Sm,
-                    items =
-                        persistentListOf(
-                            KomiSegmentedItem(value = true, title = stringResource(Res.string.tweaks_connection_use_main)),
-                            KomiSegmentedItem(value = false, title = stringResource(Res.string.tweaks_connection_custom)),
-                        ),
-                )
-                AnimatedVisibility(visible = !useMain) {
-                    Column {
-                        Spacer(Modifier.height(10.dp))
-                        ProxyTypeSegmented(
-                            selected = form.type,
-                            onSelected = { onAction(TweaksAction.OnProxyTypeSelected(scope, it)) },
-                        )
-                        AnimatedVisibility(visible = form.type == ProxyType.HTTP || form.type == ProxyType.SOCKS) {
-                            Column {
-                                Spacer(Modifier.height(10.dp))
-                                ProxyFields(
-                                    form = form,
-                                    onHost = { onAction(TweaksAction.OnProxyHostChanged(scope, it)) },
-                                    onPort = { onAction(TweaksAction.OnProxyPortChanged(scope, it)) },
-                                    onUser = { onAction(TweaksAction.OnProxyUsernameChanged(scope, it)) },
-                                    onPass = { onAction(TweaksAction.OnProxyPasswordChanged(scope, it)) },
-                                )
-                                Spacer(Modifier.height(10.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    KomiButton(
-                                        onClick = { onAction(TweaksAction.OnProxyTest(scope)) },
-                                        label = stringResource(Res.string.tweaks_connection_test),
-                                        variant = KomiButtonVariant.Outline,
-                                        size = KomiButtonSize.Sm,
-                                        enabled = !form.isTestInProgress,
-                                        loading = form.isTestInProgress,
-                                    )
-                                    KomiButton(
-                                        onClick = { onAction(TweaksAction.OnProxySave(scope)) },
-                                        label = stringResource(Res.string.proxy_save),
-                                        variant = KomiButtonVariant.Tonal,
-                                        size = KomiButtonSize.Sm,
-                                        enabled = !form.isTestInProgress,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                ProxyScopeEditor(scope = scope, state = state, onAction = onAction)
             }
         }
     }
@@ -180,7 +130,67 @@ fun connectionSectionContent(
 }
 
 @Composable
-private fun proxySummary(form: ProxyScopeFormState): String =
+internal fun ProxyScopeEditor(
+    scope: ProxyScope,
+    state: TweaksState,
+    onAction: (TweaksAction) -> Unit,
+) {
+    val useMain = state.useMain(scope)
+    val form = state.formFor(scope)
+
+    KomiSegmented(
+        selected = useMain,
+        onSelect = { onAction(TweaksAction.OnScopeUseMainToggled(scope, it)) },
+        size = KomiIconButtonSize.Sm,
+        items =
+            persistentListOf(
+                KomiSegmentedItem(value = true, title = stringResource(Res.string.tweaks_connection_use_main)),
+                KomiSegmentedItem(value = false, title = stringResource(Res.string.tweaks_connection_custom)),
+            ),
+    )
+    AnimatedVisibility(visible = !useMain) {
+        Column {
+            Spacer(Modifier.height(10.dp))
+            ProxyTypeSegmented(
+                selected = form.type,
+                onSelected = { onAction(TweaksAction.OnProxyTypeSelected(scope, it)) },
+            )
+            AnimatedVisibility(visible = form.type == ProxyType.HTTP || form.type == ProxyType.SOCKS) {
+                Column {
+                    Spacer(Modifier.height(10.dp))
+                    ProxyFields(
+                        form = form,
+                        onHost = { onAction(TweaksAction.OnProxyHostChanged(scope, it)) },
+                        onPort = { onAction(TweaksAction.OnProxyPortChanged(scope, it)) },
+                        onUser = { onAction(TweaksAction.OnProxyUsernameChanged(scope, it)) },
+                        onPass = { onAction(TweaksAction.OnProxyPasswordChanged(scope, it)) },
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        KomiButton(
+                            onClick = { onAction(TweaksAction.OnProxyTest(scope)) },
+                            label = stringResource(Res.string.tweaks_connection_test),
+                            variant = KomiButtonVariant.Outline,
+                            size = KomiButtonSize.Sm,
+                            enabled = !form.isTestInProgress,
+                            loading = form.isTestInProgress,
+                        )
+                        KomiButton(
+                            onClick = { onAction(TweaksAction.OnProxySave(scope)) },
+                            label = stringResource(Res.string.proxy_save),
+                            variant = KomiButtonVariant.Tonal,
+                            size = KomiButtonSize.Sm,
+                            enabled = !form.isTestInProgress,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun proxySummary(form: ProxyScopeFormState): String =
     when (form.type) {
         ProxyType.NONE -> stringResource(Res.string.tweaks_connection_mode_no_proxy)
         ProxyType.SYSTEM -> stringResource(Res.string.tweaks_connection_mode_system)

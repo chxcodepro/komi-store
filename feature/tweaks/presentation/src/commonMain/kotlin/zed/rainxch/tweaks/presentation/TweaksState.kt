@@ -80,6 +80,7 @@ data class TweaksState(
             .toImmutableList(),
     val languageQuery: String = "",
     val translationProviderExpanded: Boolean = false,
+    val translationProxyExpanded: Boolean = false,
     val translationTargetPickerOpen: Boolean = false,
     val translationLanguageOptions: ImmutableList<LanguagePickerOption> =
         SupportedTranslationLanguages.all

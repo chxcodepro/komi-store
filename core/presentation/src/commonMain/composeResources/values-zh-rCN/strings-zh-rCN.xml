@@ -560,6 +560,7 @@
 
     <string name="translation_intro">选择用于翻译 README 的服务。</string>
     <string name="translation_provider_title">翻译服务</string>
+    <string name="translation_proxy_title">翻译代理</string>
     <string name="translation_provider_description">Google 全球可用，无需配置。有道可从中国大陆访问，但需要从有道开发者门户获取 API 凭据。</string>
     <string name="translation_provider_google">Google</string>
     <string name="translation_provider_youdao">有道</string>

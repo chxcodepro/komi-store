@@ -827,6 +827,7 @@
 
     <string name="translation_intro">Choose the service used to translate README content.</string>
     <string name="translation_provider_title">Translation Service</string>
+    <string name="translation_proxy_title">Translation proxy</string>
     <string name="translation_provider_description">Google works globally without configuration. Youdao works from mainland China but requires API credentials from Youdao's developer portal.</string>
     <string name="translation_provider_google">Google</string>
     <string name="translation_provider_youdao">Youdao</string>

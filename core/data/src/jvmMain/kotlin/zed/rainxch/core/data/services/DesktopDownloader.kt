@@ -13,6 +13,7 @@ import okhttp3.Request
 import zed.rainxch.core.data.data_source.TokenStore
 import zed.rainxch.core.data.network.GithubAssetAuth
 import zed.rainxch.core.data.network.ProxyManager
+import zed.rainxch.core.data.network.SystemProxyResolver
 import zed.rainxch.core.domain.model.installation.DownloadProgress
 import zed.rainxch.core.domain.model.settings.ProxyConfig
 import zed.rainxch.core.domain.model.settings.ProxyScope
@@ -22,6 +23,7 @@ import java.net.Authenticator
 import java.net.InetSocketAddress
 import java.net.PasswordAuthentication
 import java.net.Proxy
+import java.net.ProxySelector
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -46,7 +48,9 @@ class DesktopDownloader(
                         proxy(Proxy.NO_PROXY)
                     }
 
-                    is ProxyConfig.System -> {}
+                    is ProxyConfig.System -> {
+                        proxySelector(SystemProxyResolver.selector() ?: ProxySelector.getDefault())
+                    }
 
                     is ProxyConfig.Http -> {
                         proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(config.host, config.port)))

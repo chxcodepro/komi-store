@@ -27,7 +27,7 @@ actual fun createPlatformHttpClient(proxyConfig: ProxyConfig): HttpClient =
                     }
 
                     is ProxyConfig.System -> {
-                        proxySelector(ProxySelector.getDefault())
+                        proxySelector(SystemProxyResolver.selector() ?: ProxySelector.getDefault())
                     }
 
                     is ProxyConfig.Http -> {
