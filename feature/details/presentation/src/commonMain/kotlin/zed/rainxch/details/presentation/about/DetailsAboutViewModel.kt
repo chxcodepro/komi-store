@@ -8,10 +8,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
+import zed.rainxch.core.domain.repository.TweaksRepository
 import zed.rainxch.details.domain.repository.DetailsRepository
 import zed.rainxch.details.domain.repository.TranslationRepository
 import zed.rainxch.details.presentation.model.SupportedLanguages
 import zed.rainxch.details.presentation.model.TranslationState
+import zed.rainxch.details.presentation.translation.isSameLanguage
+import zed.rainxch.details.presentation.translation.resolveAutoTranslateTarget
 import zed.rainxch.githubstore.core.presentation.res.Res
 import zed.rainxch.githubstore.core.presentation.res.failed_to_load
 import zed.rainxch.githubstore.core.presentation.res.translation_failed
@@ -23,6 +26,7 @@ class DetailsAboutViewModel(
     private val sourceHost: String?,
     private val detailsRepository: DetailsRepository,
     private val translationRepository: TranslationRepository,
+    private val tweaksRepository: TweaksRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -151,9 +155,23 @@ class DetailsAboutViewModel(
                     )
                 }
                 rebuildDisplayed()
+                autoTranslateIfEnabled()
             }.onFailure { e ->
                 _state.update { it.copy(isLoading = false, errorMessage = e.message ?: getString(Res.string.failed_to_load)) }
             }
+        }
+    }
+
+    private fun autoTranslateIfEnabled() {
+        if (_state.value.translation.translatedText != null) return
+        viewModelScope.launch {
+            val target =
+                resolveAutoTranslateTarget(
+                    tweaksRepository = tweaksRepository,
+                    fallbackLanguageCode = _state.value.deviceLanguageCode,
+                ) ?: return@launch
+            if (isSameLanguage(_state.value.readmeLanguage, target)) return@launch
+            translate(target)
         }
     }
 
