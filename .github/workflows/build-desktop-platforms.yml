@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - generate-installers
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -115,9 +116,12 @@ jobs:
           retention-days: 30
           compression-level: 0
 
+  # Skipped when SignPath is not configured for this repository (forks, mirrors).
+  # The release job then ships the unsigned installers instead of never running.
   sign-windows:
     name: Sign Windows installers (SignPath)
     needs: build-windows
+    if: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG != '' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -643,7 +647,18 @@ jobs:
 
   release:
     name: Draft release with all installers
-    needs: [sign-windows, build-macos, build-linux]
+    needs: [build-windows, sign-windows, build-macos, build-linux]
+    # Signing may be skipped (no SignPath configuration); the three builds must
+    # have succeeded. A failed signing job still blocks the release so an
+    # unsigned installer can never silently replace a signed one.
+    if: >-
+      ${{
+        !cancelled()
+        && needs.build-windows.result == 'success'
+        && needs.build-macos.result == 'success'
+        && needs.build-linux.result == 'success'
+        && (needs.sign-windows.result == 'success' || needs.sign-windows.result == 'skipped')
+      }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -709,13 +724,19 @@ jobs:
           linux_appimage_count=0
           linux_arch_count=0
 
-          # Windows — names already unique (.exe, .msi). Files come from the
-          # signed artifact, not the raw build output, so they carry the
-          # SignPath Authenticode signature.
+          # Windows — names already unique (.exe, .msi). Prefer the SignPath
+          # upload; when signing is not configured that artifact never exists
+          # and the unsigned one is the only source available.
+          windows_source="artifacts/windows-installers-signed"
+          if [ -z "$(find "$windows_source" -type f \( -name '*.exe' -o -name '*.msi' \) 2>/dev/null)" ]; then
+            windows_source="artifacts/windows-installers"
+            echo "No signed Windows installers found — staging the unsigned ones."
+          fi
+
           while IFS= read -r f; do
             [ -n "$f" ] || continue
             stage "$f" "$(basename "$f")" && windows_count=$((windows_count + 1)) || true
-          done < <(find artifacts/windows-installers-signed -type f \( -name '*.exe' -o -name '*.msi' \) 2>/dev/null)
+          done < <(find "$windows_source" -type f \( -name '*.exe' -o -name '*.msi' \) 2>/dev/null)
 
           # Windows portable — app-image zip from build-windows (unsigned, not
           # routed through SignPath). Filename already carries version + arch.
