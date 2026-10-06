@@ -32,6 +32,9 @@ data class InstalledApp(
     val isPendingInstall: Boolean = false,
     val installedVersionName: String? = null,
     val installedVersionCode: Long = 0L,
+    val installedReleaseId: Long? = null,
+    val installedAssetId: Long? = null,
+    val installedAssetDigest: String? = null,
     val latestVersionName: String? = null,
     val latestVersionCode: Long? = null,
     val latestReleasePublishedAt: String? = null,
@@ -58,6 +61,12 @@ data class InstalledApp(
     val pendingInstallVersion: String? = null,
 
     val pendingInstallAssetName: String? = null,
+
+    val pendingInstallReleaseId: Long? = null,
+
+    val pendingInstallAssetId: Long? = null,
+
+    val pendingInstallAssetDigest: String? = null,
 
     val skippedReleaseTag: String? = null,
     val sourceHost: String? = null,

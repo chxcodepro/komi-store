@@ -207,7 +207,11 @@ class AutoUpdateWorker(
         if (currentApp != null) {
             installedAppsRepository.updateApp(
                 currentApp
-                    .markPending()
+                    .markPending(
+                        releaseId = currentApp.latestReleaseId,
+                        assetId = currentApp.latestAssetId,
+                        assetDigest = currentApp.latestAssetDigest,
+                    )
                     .withLatestSnapshot(
                         version = latestVersion,
                         assetName = assetName,

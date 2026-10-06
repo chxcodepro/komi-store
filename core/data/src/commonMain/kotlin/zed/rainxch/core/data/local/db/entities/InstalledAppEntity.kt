@@ -16,6 +16,12 @@ data class InstalledAppEntity(
     val primaryLanguage: String?,
     val repoUrl: String,
     val installedVersion: String,
+    @ColumnInfo(defaultValue = "NULL")
+    val installedReleaseId: Long? = null,
+    @ColumnInfo(defaultValue = "NULL")
+    val installedAssetId: Long? = null,
+    @ColumnInfo(defaultValue = "NULL")
+    val installedAssetDigest: String? = null,
     val installedAssetName: String?,
     val installedAssetUrl: String?,
     val latestVersion: String?,
@@ -70,6 +76,15 @@ data class InstalledAppEntity(
     val pendingInstallVersion: String? = null,
 
     val pendingInstallAssetName: String? = null,
+
+    @ColumnInfo(defaultValue = "NULL")
+    val pendingInstallReleaseId: Long? = null,
+
+    @ColumnInfo(defaultValue = "NULL")
+    val pendingInstallAssetId: Long? = null,
+
+    @ColumnInfo(defaultValue = "NULL")
+    val pendingInstallAssetDigest: String? = null,
 
     @ColumnInfo(defaultValue = "NULL")
     val skippedReleaseTag: String? = null,

@@ -201,6 +201,18 @@ interface InstalledAppDao {
     @Query(
         """
         UPDATE installed_apps
+           SET installedReleaseId = NULL,
+               installedAssetId = NULL,
+               installedAssetDigest = NULL
+         WHERE packageName = :packageName
+        """,
+    )
+    suspend fun clearInstallBinding(packageName: String)
+
+    // Must not touch the pending identity: callers clear the path before the system confirms the install.
+    @Query(
+        """
+        UPDATE installed_apps
            SET pendingInstallFilePath = :path,
                pendingInstallVersion = :version,
                pendingInstallAssetName = :assetName

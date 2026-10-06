@@ -24,6 +24,7 @@ class UpdateVerdictTest {
         storedAssetId: Long? = null,
         matchedReleaseId: Long? = null,
         matchedAssetId: Long? = null,
+        bound: UpdateVerdict.Bound? = null,
     ): UpdateVerdict.Result =
         UpdateVerdict.decide(
             installed = UpdateVerdict.Installed(installedTag, installedVersionCode),
@@ -49,6 +50,7 @@ class UpdateVerdictTest {
                     assetSize = matchedAssetSize,
                 ),
             skippedTag = skippedTag,
+            bound = bound,
         )
 
     @Test
@@ -599,5 +601,202 @@ class UpdateVerdictTest {
                 matchedAssetSize = 70_543_755L,
             )
         assertTrue(result.isUpdateAvailable)
+    }
+
+    @Test
+    fun a_later_release_with_a_different_file_is_an_update() {
+        // 26.09.8 installed, 26.09.8a published afterwards as a different file. fallback=false
+        // proves the report comes from the release date, not from a carried-over verdict.
+        val sameFile =
+            UpdateVerdict.isSameFile(
+                installedAssetId = 11L,
+                installedAssetDigest = "sha256:old",
+                matchedAssetId = 22L,
+                matchedAssetDigest = "sha256:new",
+            )
+        assertFalse(sameFile)
+
+        assertTrue(
+            UpdateVerdict.decideBound(
+                sameFile = sameFile,
+                matchedPublishedAt = "2026-09-08T12:00:00Z",
+                installedReleasePublishedAt = "2026-09-08T00:00:00Z",
+                fallback = false,
+            ),
+        )
+    }
+
+    @Test
+    fun a_rebuilt_nightly_with_a_changed_file_is_an_update() {
+        // Same 'nightly' tag: the identity, not the tag string, has to carry the signal.
+        val sameFile =
+            UpdateVerdict.isSameFile(
+                installedAssetId = 100L,
+                installedAssetDigest = null,
+                matchedAssetId = 200L,
+                matchedAssetDigest = null,
+            )
+        assertFalse(sameFile)
+
+        assertTrue(
+            UpdateVerdict.decideBound(
+                sameFile = sameFile,
+                matchedPublishedAt = "2026-09-25T02:00:00Z",
+                installedReleasePublishedAt = "2026-09-24T11:46:11Z",
+                fallback = false,
+            ),
+        )
+    }
+
+    @Test
+    fun the_same_asset_id_stays_quiet_even_when_the_tag_reads_differently() {
+        val sameFile =
+            UpdateVerdict.isSameFile(
+                installedAssetId = 42L,
+                installedAssetDigest = null,
+                matchedAssetId = 42L,
+                matchedAssetDigest = null,
+            )
+        assertTrue(sameFile)
+
+        // fallback=true: a false here can only come from the same-file short circuit.
+        assertFalse(
+            UpdateVerdict.decideBound(
+                sameFile = sameFile,
+                matchedPublishedAt = "2026-09-10T00:00:00Z",
+                installedReleasePublishedAt = "2026-09-01T00:00:00Z",
+                fallback = true,
+            ),
+        )
+    }
+
+    @Test
+    fun a_matching_digest_beats_a_new_asset_id() {
+        // Digests are the stronger statement: a re-upload keeps the bytes under a new id.
+        val sameFile =
+            UpdateVerdict.isSameFile(
+                installedAssetId = 7L,
+                installedAssetDigest = "sha256:same",
+                matchedAssetId = 8L,
+                matchedAssetDigest = "sha256:same",
+            )
+        assertTrue(sameFile)
+
+        assertFalse(
+            UpdateVerdict.decideBound(
+                sameFile = sameFile,
+                matchedPublishedAt = "2026-09-10T00:00:00Z",
+                installedReleasePublishedAt = "2026-09-01T00:00:00Z",
+                fallback = true,
+            ),
+        )
+    }
+
+    @Test
+    fun a_different_file_from_an_earlier_release_is_not_an_update() {
+        val sameFile =
+            UpdateVerdict.isSameFile(
+                installedAssetId = 5L,
+                installedAssetDigest = "sha256:new",
+                matchedAssetId = 6L,
+                matchedAssetDigest = "sha256:old",
+            )
+        assertFalse(sameFile)
+
+        // fallback=true: staying quiet can only come from the release date going forwards.
+        assertFalse(
+            UpdateVerdict.decideBound(
+                sameFile = sameFile,
+                matchedPublishedAt = "2026-08-01T00:00:00Z",
+                installedReleasePublishedAt = "2026-09-01T00:00:00Z",
+                fallback = true,
+            ),
+        )
+    }
+
+    @Test
+    fun an_installed_release_outside_the_window_falls_back_to_the_tag_verdict() {
+        assertTrue(
+            UpdateVerdict.decideBound(
+                sameFile = false,
+                matchedPublishedAt = "2026-09-10T00:00:00Z",
+                installedReleasePublishedAt = null,
+                fallback = true,
+            ),
+        )
+        assertFalse(
+            UpdateVerdict.decideBound(
+                sameFile = false,
+                matchedPublishedAt = "2026-09-10T00:00:00Z",
+                installedReleasePublishedAt = null,
+                fallback = false,
+            ),
+        )
+    }
+
+    @Test
+    fun a_skipped_release_stays_skipped_for_a_bound_record() {
+        val result =
+            decide(
+                installedTag = "1.0.0",
+                matchedTag = "1.1.0",
+                matchedPublishedAt = "2026-08-01T00:00:00Z",
+                matchedAssetId = 22L,
+                skippedTag = "1.1.0",
+                bound =
+                    UpdateVerdict.Bound(
+                        assetId = 11L,
+                        assetDigest = null,
+                        releasePublishedAt = "2026-07-01T00:00:00Z",
+                    ),
+            )
+        assertFalse(result.isUpdateAvailable)
+    }
+
+    @Test
+    fun a_bound_record_on_the_matched_file_is_up_to_date_whatever_the_tags_say() {
+        val unbound = decide(installedTag = "1.0.0", matchedTag = "1.1.0", matchedAssetId = 42L)
+        assertTrue(unbound.isUpdateAvailable)
+
+        val bound =
+            decide(
+                installedTag = "1.0.0",
+                matchedTag = "1.1.0",
+                matchedAssetId = 42L,
+                bound =
+                    UpdateVerdict.Bound(
+                        assetId = 42L,
+                        assetDigest = null,
+                        releasePublishedAt = "2026-07-01T00:00:00Z",
+                    ),
+            )
+        assertFalse(bound.isUpdateAvailable)
+    }
+
+    @Test
+    fun a_bound_record_reports_a_later_file_the_tags_cannot_tell_apart() {
+        val unbound =
+            decide(
+                installedTag = "26.09.8",
+                matchedTag = "26.09.8a",
+                matchedPublishedAt = "2026-09-08T12:00:00Z",
+                matchedAssetId = 22L,
+            )
+        assertFalse(unbound.isUpdateAvailable)
+
+        val bound =
+            decide(
+                installedTag = "26.09.8",
+                matchedTag = "26.09.8a",
+                matchedPublishedAt = "2026-09-08T12:00:00Z",
+                matchedAssetId = 22L,
+                bound =
+                    UpdateVerdict.Bound(
+                        assetId = 11L,
+                        assetDigest = null,
+                        releasePublishedAt = "2026-09-08T00:00:00Z",
+                    ),
+            )
+        assertTrue(bound.isUpdateAvailable)
     }
 }

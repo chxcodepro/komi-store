@@ -340,6 +340,20 @@ class InstalledAppsRepositoryImpl(
 
             val (matchedRelease, primaryAsset, variantWasLost) = resolved
 
+            val bound =
+                if (app.installedAssetId != null || app.installedAssetDigest != null) {
+                    UpdateVerdict.Bound(
+                        assetId = app.installedAssetId,
+                        assetDigest = app.installedAssetDigest,
+                        releasePublishedAt =
+                            app.installedReleaseId?.let { id ->
+                                releases.firstOrNull { it.id == id }?.publishedAt
+                            },
+                    )
+                } else {
+                    null
+                }
+
             val verdict =
                 UpdateVerdict.decide(
                     installed =
@@ -369,6 +383,7 @@ class InstalledAppsRepositoryImpl(
                             assetSize = primaryAsset.size,
                         ),
                     skippedTag = app.skippedReleaseTag,
+                    bound = bound,
                 )
 
             if (verdict.skipBecameStale) {
@@ -382,6 +397,7 @@ class InstalledAppsRepositoryImpl(
                         "installedTag=${app.installedVersion} matchedTag=${matchedRelease.tagName} " +
                         "storedPublishedAt=${app.latestReleasePublishedAt} " +
                         "matchedPublishedAt=${matchedRelease.publishedAt} " +
+                        "bound=${bound != null} " +
                         "isUpdate=$isUpdateAvailable"
             }
 
@@ -460,8 +476,11 @@ class InstalledAppsRepositoryImpl(
     override suspend fun updateAppVersion(
         packageName: String,
         newTag: String,
-        newAssetName: String,
-        newAssetUrl: String,
+        newReleaseId: Long?,
+        newAssetId: Long?,
+        newAssetDigest: String?,
+        newAssetName: String?,
+        newAssetUrl: String?,
         newVersionName: String,
         newVersionCode: Long,
         signingFingerprint: String?,
@@ -491,6 +510,9 @@ class InstalledAppsRepositoryImpl(
             app.toDomain()
                 .confirmInstall(
                     tag = newTag,
+                    releaseId = newReleaseId,
+                    assetId = newAssetId,
+                    assetDigest = newAssetDigest,
                     assetName = newAssetName,
                     assetUrl = newAssetUrl,
                     versionName = newVersionName,
@@ -501,6 +523,10 @@ class InstalledAppsRepositoryImpl(
                 )
                 .toEntity(),
         )
+    }
+
+    override suspend fun clearInstallBinding(packageName: String) {
+        installedAppsDao.clearInstallBinding(packageName)
     }
 
     override suspend fun updateApp(app: InstalledApp) {
@@ -530,7 +556,17 @@ class InstalledAppsRepositoryImpl(
         val app = installedAppsDao.getAppByPackage(packageName) ?: return
         installedAppsDao.updateApp(
             app.toDomain()
-                .let { if (isPending) it.markPending() else it.clearPending() }
+                .let {
+                    if (isPending) {
+                        it.markPending(
+                            releaseId = app.latestReleaseId,
+                            assetId = app.latestAssetId,
+                            assetDigest = app.latestAssetDigest,
+                        )
+                    } else {
+                        it.clearPending()
+                    }
+                }
                 .toEntity(),
         )
     }

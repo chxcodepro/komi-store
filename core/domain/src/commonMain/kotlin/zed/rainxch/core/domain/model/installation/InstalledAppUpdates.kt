@@ -6,8 +6,12 @@ import zed.rainxch.core.domain.utils.resolveExternalInstallVerdict
 
 fun InstalledApp.confirmInstall(
     tag: String,
-    assetName: String,
-    assetUrl: String,
+    releaseId: Long? = null,
+    assetId: Long? = null,
+    assetDigest: String? = null,
+    // Unknown must be null, never "": "" never equals a real asset name.
+    assetName: String?,
+    assetUrl: String?,
     versionName: String,
     versionCode: Long,
     signingFingerprint: String?,
@@ -39,6 +43,9 @@ fun InstalledApp.confirmInstall(
         installedAssetUrl = assetUrl,
         installedVersionName = versionName,
         installedVersionCode = versionCode,
+        installedReleaseId = releaseId,
+        installedAssetId = assetId,
+        installedAssetDigest = assetDigest,
         isUpdateAvailable =
             when {
                 latestIsSkipped -> false
@@ -55,6 +62,9 @@ fun InstalledApp.confirmInstall(
         pendingInstallFilePath = parkedFile,
         pendingInstallVersion = parkedVersion,
         pendingInstallAssetName = parkedAsset,
+        pendingInstallReleaseId = null,
+        pendingInstallAssetId = null,
+        pendingInstallAssetDigest = null,
     )
 }
 
@@ -71,12 +81,43 @@ fun InstalledApp.resolvePendingFromSystem(
         } else {
             installedVersion
         }
-    return copy(
+    return withSettledInstallIdentity(versionCode).copy(
         isPendingInstall = false,
         installedVersion = adoptedTag,
         installedVersionName = versionName,
         installedVersionCode = versionCode,
         isUpdateAvailable = updateFlagAgainstSnapshot(versionCode, versionName ?: adoptedTag),
+    )
+}
+
+fun InstalledApp.withSettledInstallIdentity(versionCode: Long): InstalledApp {
+    val hasParkedIdentity =
+        pendingInstallReleaseId != null || pendingInstallAssetId != null || pendingInstallAssetDigest != null
+    val targetCode = latestVersionCode ?: 0L
+    val parkedBuildLanded = hasParkedIdentity && targetCode > 0L && versionCode == targetCode
+    val recordedBuildStands = !parkedBuildLanded && versionCode == installedVersionCode
+    return copy(
+        installedReleaseId =
+            when {
+                parkedBuildLanded -> pendingInstallReleaseId
+                recordedBuildStands -> installedReleaseId
+                else -> null
+            },
+        installedAssetId =
+            when {
+                parkedBuildLanded -> pendingInstallAssetId
+                recordedBuildStands -> installedAssetId
+                else -> null
+            },
+        installedAssetDigest =
+            when {
+                parkedBuildLanded -> pendingInstallAssetDigest
+                recordedBuildStands -> installedAssetDigest
+                else -> null
+            },
+        pendingInstallReleaseId = null,
+        pendingInstallAssetId = null,
+        pendingInstallAssetDigest = null,
     )
 }
 
@@ -136,22 +177,86 @@ fun InstalledApp.tagForObservedBuild(
     return if (codeProvesSnapshot || nameProvesSnapshot) snapshotTag else installedVersion
 }
 
+fun InstalledApp.deviceChangeAgainst(local: SystemPackageInfo): DeviceChange {
+    val signerDrifted = signerDiffersFrom(local)
+    val versionMatches =
+        local.versionCode == installedVersionCode && local.versionName == installedVersionName
+    return when {
+        versionMatches && !signerDrifted -> DeviceChange.NONE
+        local.versionCode < installedVersionCode -> DeviceChange.DOWNGRADE
+        versionMatches -> DeviceChange.SIGNER_CHANGE
+        else -> DeviceChange.VERSION_CHANGE
+    }
+}
+
+fun InstalledApp.bindingStatusAgainst(local: SystemPackageInfo): BindingStatus {
+    if (local.packageName != packageName) {
+        return BindingStatus.Broken(BindingStatus.BreakReason.PACKAGE_NAME)
+    }
+
+    if (local.versionCode > 0L &&
+        installedVersionCode > 0L &&
+        local.versionCode != installedVersionCode
+    ) {
+        return BindingStatus.Broken(BindingStatus.BreakReason.VERSION_CODE)
+    }
+
+    if (local.versionName.isNotBlank() &&
+        !installedVersionName.isNullOrBlank() &&
+        local.versionName != installedVersionName
+    ) {
+        return BindingStatus.Broken(BindingStatus.BreakReason.VERSION_NAME)
+    }
+
+    if (signerDiffersFrom(local)) {
+        return BindingStatus.Broken(BindingStatus.BreakReason.SIGNING_FINGERPRINT)
+    }
+
+    return BindingStatus.Intact
+}
+
+private fun InstalledApp.signerDiffersFrom(local: SystemPackageInfo): Boolean {
+    val localSign = local.signingFingerprint
+    return !localSign.isNullOrBlank() &&
+        !signingFingerprint.isNullOrBlank() &&
+        !localSign.equals(signingFingerprint, ignoreCase = true)
+}
+
 fun InstalledApp.observeExternalInstall(
     versionName: String?,
     versionCode: Long,
+    signingFingerprint: String? = null,
 ): InstalledApp {
     val adoptedTag = tagForObservedBuild(versionName, versionCode)
     return copy(
         installedVersion = adoptedTag,
         installedVersionName = versionName,
         installedVersionCode = versionCode,
+        signingFingerprint = signingFingerprint ?: this.signingFingerprint,
+        installedReleaseId = null,
+        installedAssetId = null,
+        installedAssetDigest = null,
         isUpdateAvailable = updateFlagAgainstSnapshot(versionCode, versionName ?: adoptedTag),
     )
 }
 
-fun InstalledApp.markPending(): InstalledApp = copy(isPendingInstall = true)
+fun InstalledApp.markPending(
+    releaseId: Long?,
+    assetId: Long?,
+    assetDigest: String?,
+): InstalledApp = copy(
+    isPendingInstall = true,
+    pendingInstallReleaseId = releaseId,
+    pendingInstallAssetId = assetId,
+    pendingInstallAssetDigest = assetDigest,
+)
 
-fun InstalledApp.clearPending(): InstalledApp = copy(isPendingInstall = false)
+fun InstalledApp.clearPending(): InstalledApp = copy(
+    isPendingInstall = false,
+    pendingInstallReleaseId = null,
+    pendingInstallAssetId = null,
+    pendingInstallAssetDigest = null,
+)
 
 fun InstalledApp.withLatestSnapshot(
     version: String,

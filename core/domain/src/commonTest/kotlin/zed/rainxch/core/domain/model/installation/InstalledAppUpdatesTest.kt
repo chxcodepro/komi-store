@@ -356,6 +356,55 @@ class InstalledAppUpdatesTest {
     }
 
     @Test
+    fun resolvePendingFromSystemDropsTheBindingWhenTheInstallDidNotLand() {
+        val result =
+            app(latestVersionCode = 300L)
+                .copy(
+                    installedReleaseId = 7001L,
+                    installedAssetId = 7002L,
+                    installedAssetDigest = "sha256:x",
+                )
+                .resolvePendingFromSystem(
+                    resolvedTag = "2.0.0",
+                    versionName = "2.0.0",
+                    versionCode = 200L,
+                )
+        assertEquals(null, result.installedReleaseId)
+        assertEquals(null, result.installedAssetId)
+        assertEquals(null, result.installedAssetDigest)
+    }
+
+    @Test
+    fun resolvePendingFromSystemKeepsTheBindingWhenThereWasNoTarget() {
+        val result =
+            app(latestVersionCode = null)
+                .copy(installedReleaseId = 7001L)
+                .resolvePendingFromSystem(
+                    resolvedTag = "1.0.0",
+                    versionName = "1.0.0",
+                    versionCode = 100L,
+                )
+        assertEquals(7001L, result.installedReleaseId)
+    }
+
+    @Test
+    fun resolvePendingFromSystemKeepsTheBindingWhenTheInstallLanded() {
+        val result =
+            app(installedVersionCode = 200L, latestVersionCode = 200L)
+                .copy(
+                    installedReleaseId = 7001L,
+                    installedAssetId = 7002L,
+                    installedAssetDigest = "sha256:x",
+                )
+                .resolvePendingFromSystem(
+                    resolvedTag = "2.0.0",
+                    versionName = "2.0.0",
+                    versionCode = 200L,
+                )
+        assertEquals(7001L, result.installedReleaseId)
+    }
+
+    @Test
     fun resolvePendingFromSystemKeepsUpdateFlagWhenSnapshotNewer() {
         val result = app(latestVersionCode = 300L).resolvePendingFromSystem(
             resolvedTag = "2.0.0",
@@ -461,7 +510,11 @@ class InstalledAppUpdatesTest {
 
     @Test
     fun markAndClearPendingTouchOnlyPendingFlag() {
-        val marked = app().markPending()
+        val marked = app().markPending(
+            releaseId = 7001L,
+            assetId = 7002L,
+            assetDigest = "sha256:aaa",
+        )
         assertTrue(marked.isPendingInstall)
         assertEquals("/data/parked.apk", marked.pendingInstallFilePath)
 
@@ -491,7 +544,11 @@ class InstalledAppUpdatesTest {
     @Test
     fun chainedPreInstallHandoffCombinesBothZones() {
         val result = app()
-            .markPending()
+            .markPending(
+                releaseId = 7001L,
+                assetId = 7002L,
+                assetDigest = "sha256:aaa",
+            )
             .withLatestSnapshot(
                 version = "3.0.0",
                 assetName = "a3",
@@ -648,3 +705,4 @@ class InstalledAppUpdatesTest {
         )
     }
 }
+

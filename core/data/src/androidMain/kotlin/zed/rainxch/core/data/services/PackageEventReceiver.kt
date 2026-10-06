@@ -16,6 +16,7 @@ import zed.rainxch.core.domain.model.installation.externalInstallUpdateFlag
 import zed.rainxch.core.domain.model.installation.resolvePendingFromSystem
 import zed.rainxch.core.domain.model.installation.snapshotStillNamesNewerBuild
 import zed.rainxch.core.domain.model.installation.tagForObservedBuild
+import zed.rainxch.core.domain.model.installation.withSettledInstallIdentity
 import zed.rainxch.core.domain.repository.ExternalImportRepository
 import zed.rainxch.core.domain.repository.InstalledAppsRepository
 import zed.rainxch.core.domain.system.ExternalLinkState
@@ -157,11 +158,15 @@ class PackageEventReceiver() :
                                 ?: app.latestVersion
                                 ?: systemInfo.versionName
                         if (wasActuallyUpdated) {
+                            val settled = app.withSettledInstallIdentity(systemInfo.versionCode)
                             repo.updateAppVersion(
                                 packageName = packageName,
                                 newTag = installedTag,
-                                newAssetName = app.latestAssetName ?: "",
-                                newAssetUrl = app.latestAssetUrl ?: "",
+                                newReleaseId = settled.installedReleaseId,
+                                newAssetId = settled.installedAssetId,
+                                newAssetDigest = settled.installedAssetDigest,
+                                newAssetName = app.latestAssetName,
+                                newAssetUrl = app.latestAssetUrl,
                                 newVersionName = systemInfo.versionName,
                                 newVersionCode = systemInfo.versionCode,
                                 signingFingerprint = app.signingFingerprint,
@@ -262,13 +267,16 @@ class PackageEventReceiver() :
                 VersionVerdict.UNKNOWN -> app.isUpdateAvailable
             }
 
-        repo.updateInstalledVersion(
-            packageName = packageName,
-            installedVersion = app.tagForObservedBuild(systemInfo.versionName, systemInfo.versionCode),
-            installedVersionName = systemInfo.versionName,
-            installedVersionCode = systemInfo.versionCode,
-            isUpdateAvailable = newIsUpdateAvailable,
-        )
+        repo.executeInTransaction {
+            repo.updateInstalledVersion(
+                packageName = packageName,
+                installedVersion = app.tagForObservedBuild(systemInfo.versionName, systemInfo.versionCode),
+                installedVersionName = systemInfo.versionName,
+                installedVersionCode = systemInfo.versionCode,
+                isUpdateAvailable = newIsUpdateAvailable,
+            )
+            repo.clearInstallBinding(packageName)
+        }
 
         Logger.i {
             "External version change via broadcast: $packageName " +

@@ -27,11 +27,18 @@ object UpdateVerdict {
         val assetSize: Long? = null,
     )
 
+    data class Bound(
+        val assetId: Long?,
+        val assetDigest: String?,
+        val releasePublishedAt: String?,
+    )
+
     fun decide(
         installed: Installed,
         stored: Stored,
         matched: Matched,
         skippedTag: String?,
+        bound: Bound? = null,
     ): Result {
         val reconcilable = VersionMath.versionsReconcilable(installed.tag, matched.tag)
         val codesAlreadyMatch =
@@ -100,9 +107,8 @@ object UpdateVerdict {
                 false
             }
 
-        val isUpdateAvailable =
+        val tagVerdict =
             when {
-                skipHolds -> false
                 usedTimestampLogic -> timestampWouldReport
                 codesAlreadyMatch -> false
                 !reconcilable -> false
@@ -110,6 +116,25 @@ object UpdateVerdict {
                     VersionMath.isVersionNewer(
                         candidate = matched.tag,
                         current = installed.tag,
+                    )
+            }
+
+        val isUpdateAvailable =
+            when {
+                skipHolds -> false
+                bound == null -> tagVerdict
+                else ->
+                    decideBound(
+                        sameFile =
+                            isSameFile(
+                                installedAssetId = bound.assetId,
+                                installedAssetDigest = bound.assetDigest,
+                                matchedAssetId = matched.assetId,
+                                matchedAssetDigest = matched.assetDigest,
+                            ),
+                        matchedPublishedAt = matched.publishedAt,
+                        installedReleasePublishedAt = bound.releasePublishedAt,
+                        fallback = tagVerdict,
                     )
             }
 
@@ -125,6 +150,29 @@ object UpdateVerdict {
         installedTag: String?,
         matchedTag: String,
     ): Boolean = installedTag != matchedTag && codesAlreadyMatch
+
+    fun isSameFile(
+        installedAssetId: Long?,
+        installedAssetDigest: String?,
+        matchedAssetId: Long?,
+        matchedAssetDigest: String?,
+    ): Boolean {
+        if (installedAssetDigest != null && matchedAssetDigest != null) {
+            return installedAssetDigest == matchedAssetDigest
+        }
+        return installedAssetId != null && matchedAssetId != null && installedAssetId == matchedAssetId
+    }
+
+    fun decideBound(
+        sameFile: Boolean,
+        matchedPublishedAt: String?,
+        installedReleasePublishedAt: String?,
+        fallback: Boolean,
+    ): Boolean = when {
+        sameFile -> false
+        installedReleasePublishedAt == null -> fallback
+        else -> VersionMath.isPublishedAtAfter(matchedPublishedAt, installedReleasePublishedAt)
+    }
 
     data class Result(
         val isUpdateAvailable: Boolean,
